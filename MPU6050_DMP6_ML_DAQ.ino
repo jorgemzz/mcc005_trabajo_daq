@@ -61,8 +61,8 @@ THE SOFTWARE.
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
 // AD0 high = 0x69
-MPU6050 mpu;
-//MPU6050 mpu(0x69); // <-- use for AD0 high
+// MPU6050 mpu;
+MPU6050 mpu(0x69); // <-- use for AD0 high
 
 /* =========================================================================
    NOTE: In addition to connection 3.3v, GND, SDA, and SCL, this sketch
@@ -100,7 +100,7 @@ MPU6050 mpu;
 // from the FIFO. Note this also requires gravity vector calculations.
 // Also note that yaw/pitch/roll angles suffer from gimbal lock (for
 // more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
-#define OUTPUT_READABLE_YAWPITCHROLL
+//#define OUTPUT_READABLE_YAWPITCHROLL
 
 // uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
 // components with gravity removed. This acceleration reference frame is
@@ -119,7 +119,7 @@ MPU6050 mpu;
 // format used for the InvenSense teapot demo
 //#define OUTPUT_TEAPOT
 
-
+#define OUTPUT_READABLE_CUSTOMACCEL
 
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
@@ -336,6 +336,45 @@ void loop() {
             teapotPacket[9] = fifoBuffer[13];
             Serial.write(teapotPacket, 14);
             teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
+        #endif
+
+        #ifdef OUTPUT_READABLE_CUSTOMACCEL
+            // Print 3 types of acceleration for validation and safeguard
+            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            mpu.dmpGetAccel(&aa, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            //mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+            //mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+
+            VectorFloat aa_g;
+            aa_g.x = aa.x / 8192.0;     // Divide by 8192.0 to get "g" force
+            aa_g.y = aa.y / 8192.0;
+            aa_g.z = aa.z / 8192.0;
+
+            VectorFloat aa_ms2;
+            aa_ms2.x = aa_g.x * 9.81;   // Multiply by 9.81 to get meters per second squared (m/s²)
+            aa_ms2.y = aa_g.y * 9.81;
+            aa_ms2.z = aa_g.z * 9.81;
+
+            // Serial.print("Accel m/s2:\t");
+            // Serial.print(aa_ms2.x); Serial.print("\t");
+            // Serial.print(aa_ms2.y); Serial.print("\t");
+            // Serial.println(aa_ms2.z);
+
+            VectorFloat aalinear_g;
+            aalinear_g.x = aa_g.x - gravity.x;
+            aalinear_g.y = aa_g.y - gravity.y;
+            aalinear_g.z = aa_g.z - gravity.z;
+
+            VectorFloat aalinear_ms2;
+            aalinear_ms2.x = aalinear_g.x * 9.81;
+            aalinear_ms2.y = aalinear_g.y * 9.81;
+            aalinear_ms2.z = aalinear_g.z * 9.81;
+
+            Serial.print("Linear Accel m/s2:\t");
+            Serial.print(aalinear_ms2.x); Serial.print("\t");
+            Serial.print(aalinear_ms2.y); Serial.print("\t");
+            Serial.println(aalinear_ms2.z);
         #endif
 
         // blink LED to indicate activity
