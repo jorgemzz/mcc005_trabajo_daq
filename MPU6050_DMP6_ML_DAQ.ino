@@ -119,10 +119,12 @@ MPU6050 mpu(0x69); // <-- use for AD0 high
 // format used for the InvenSense teapot demo
 //#define OUTPUT_TEAPOT
 
-#define OUTPUT_READABLE_CUSTOMACCEL
+// #define OUTPUT_READABLE_CUSTOMACCEL
+#define OUTPUT_READABLE_DAQ
 
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
+#define BUTTON_PIN 3
 bool blinkState = false;
 
 // MPU control/status vars
@@ -187,16 +189,17 @@ void setup() {
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
+    pinMode(BUTTON_PIN, INPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
     Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // wait for ready
-    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
-    while (Serial.available() && Serial.read()); // empty buffer
-    while (!Serial.available());                 // wait for data
-    while (Serial.available() && Serial.read()); // empty buffer again
+    // Serial.println(F("\nSend any character to begin DMP programming and demo: "));
+    // while (Serial.available() && Serial.read()); // empty buffer
+    // while (!Serial.available());                 // wait for data
+    // while (Serial.available() && Serial.read()); // empty buffer again
 
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
@@ -251,7 +254,26 @@ void setup() {
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
+bool log_state = false;
+
 void loop() {
+    //Wait for push button press to stop program
+    if(digitalRead(BUTTON_PIN) == LOW){
+        delay(50);
+        if(digitalRead(BUTTON_PIN) == LOW){
+            log_state = !log_state;
+
+            if(log_state){
+                Serial.println("Button pressed! Log started...");
+                Serial.println("ax_raw,ay_raw,az_raw,ax_linear,ay_linear,az_linear,ax_world,ay_world,az_world");    // Header for .csv output
+            }else{
+                Serial.println("Button pressed! Log stopped...");
+            }
+
+            while(digitalRead(BUTTON_PIN) == LOW);
+        }
+    }
+
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
@@ -375,6 +397,39 @@ void loop() {
             Serial.print(aalinear_ms2.x); Serial.print("\t");
             Serial.print(aalinear_ms2.y); Serial.print("\t");
             Serial.println(aalinear_ms2.z);
+        #endif
+
+        #ifdef OUTPUT_READABLE_DAQ
+            // Print 3 types of acceleration for DAQ and safeguard
+            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            mpu.dmpGetAccel(&aa, fifoBuffer);
+            mpu.dmpGetGravity(&gravity, &q);
+            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+            mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+
+            VectorFloat aa_g;
+            aa_g.x = aa.x / 8192.0;     // Divide by 8192.0 to get "g" force
+            aa_g.y = aa.y / 8192.0;
+            aa_g.z = aa.z / 8192.0;
+
+            VectorFloat aa_ms2;
+            aa_ms2.x = aa_g.x * 9.81;   // Multiply by 9.81 to get meters per second squared (m/s²)
+            aa_ms2.y = aa_g.y * 9.81;
+            aa_ms2.z = aa_g.z * 9.81;
+
+            if(log_state){
+                Serial.print(aa.x); Serial.print(",");
+                Serial.print(aa.y); Serial.print(",");
+                Serial.print(aa.z); Serial.print(",");
+
+                Serial.print(aaReal.x); Serial.print(",");
+                Serial.print(aaReal.y); Serial.print(",");
+                Serial.print(aaReal.z); Serial.print(",");
+
+                Serial.print(aaWorld.x); Serial.print(",");
+                Serial.print(aaWorld.y); Serial.print(",");
+                Serial.print(aaWorld.z); Serial.print("\r \n");
+            }
         #endif
 
         // blink LED to indicate activity
