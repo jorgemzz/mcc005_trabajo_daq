@@ -61,8 +61,8 @@ THE SOFTWARE.
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
 // AD0 high = 0x69
-// MPU6050 mpu;
-MPU6050 mpu(0x69); // <-- use for AD0 high
+MPU6050 mpu;
+// MPU6050 mpu(0x69); // <-- use for AD0 high
 
 /* =========================================================================
    NOTE: In addition to connection 3.3v, GND, SDA, and SCL, this sketch
@@ -189,7 +189,7 @@ void setup() {
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
-    pinMode(BUTTON_PIN, INPUT);
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -417,7 +417,7 @@ void loop() {
             aa_ms2.y = aa_g.y * 9.81;
             aa_ms2.z = aa_g.z * 9.81;
 
-            if(log_state){
+            if(true){
                 Serial.print(aa.x); Serial.print(",");
                 Serial.print(aa.y); Serial.print(",");
                 Serial.print(aa.z); Serial.print(",");
